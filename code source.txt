@@ -1,0 +1,220 @@
+unsigned int p1, p2, p3, p4;
+unsigned int stage = 0x00;
+void first_stage();
+void second_stage();
+void third_stage();
+float distance;
+unsigned int sensorValue;
+void init_prog();
+unsigned int ATD_read(unsigned int channel_Number);
+void ATD_start();
+void detect_players();
+unsigned carts = 0x0034;
+void mydelay();
+void PWM_Init();
+void thraw_carts(unsigned int n);
+void third_stage();
+void stepper(unsigned int x)
+{
+unsigned int i;
+for (i=0; i<x; i++){
+PORTE = PORTE &0xFE;
+mydelay();
+PORTE = PORTE | 0x01;
+mydelay();
+}
+delay_ms(1000);
+PORTE = 0x00;
+
+}
+void init_prog(){
+TRISE = 0x00; // PORT D as output port
+PORTE = 0x00; // PORT E as output port
+TRISB = 0x00;
+PORTB = 0x00;
+TRISC = 0x00;
+PORTC = 0x00;
+TRISD = 0x00;
+PORTD = 0x00;
+ATD_start();
+delay_ms(500);
+PWM_Init();
+p1 = 0x00C9;
+p2 = 0x00C9;
+p3 =  0x00C9;
+p4 = 0x00C9;
+}
+void ATD_start() // set ADCON0 , ADCON1 to start ATD reading
+{
+  ADCON0 = 0x01;
+  ADCON1 = 0xCE; // right justified , FOSC/4 ,RA0 only analog
+  TRISA = 0xFF;
+}
+
+unsigned int ATD_read(unsigned int channel_Number) //reading analog sensor with channel number
+{
+  channel_Number = channel_Number << 3;
+  ADCON0 = 0x01;
+  ADCON0 = ADCON0 | 0x04 | channel_Number; // go + this chanle number
+  while (ADCON0 & 0x04);
+
+  return ((ADRESH << 8) | ADRESL);
+}
+
+
+
+
+void main()
+{
+ init_prog();
+ stage = 0x01;
+ first_stage();
+ stage = 0x02;
+ second_stage();
+ stage = 0x03;
+ third_stage();
+}
+
+void first_stage(){
+    detect_players();
+}
+
+
+void second_stage(){
+  unsigned int c;
+
+for (c=0; c<200; c++){
+  PORTD = PORTD &0xFE;
+  mydelay();   delay_ms(10);
+  if( c == p1 && carts == 0x0034){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x05);
+  }
+
+  else if( c == p2 && carts == 0x002F){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x05);
+  }
+
+  else if( c == p3 && carts == 0x002A){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x05);
+  }
+
+  else if( c == p4 && carts == 0x0025){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x05);
+  }
+
+  PORTD  = PORTD | 0x01;
+  mydelay();     delay_ms(10);
+  }
+
+}
+void detect_players(){
+unsigned int i;
+for (i=0; i<200; i++){
+  PORTD = PORTD &0xFE;
+  mydelay();   delay_ms(10);
+  PORTD  = PORTD | 0x01;
+  mydelay();     delay_ms(10);
+
+  sensorValue = ATD_read(0x00);
+  distance = 13*(1/sensorValue);
+  if (sensorValue>= 100)
+  {
+
+    if(p1 == 0x00C9){
+          p1 = i;
+          delay_ms(1000);
+    }
+    else if(p2 == 0x00C9){
+      if((i-p1) > 0x002D){
+        p2 = i;
+        delay_ms(1000);
+      }
+    }
+
+    else if(p3 == 0x00C9){
+
+        if((i-p2) > 0x002D){
+                p3 = i;
+                delay_ms(1000);
+              }
+
+    }
+
+    else if(p4 == 0x00C9){
+        if((i-p3) > 0x002D){
+                p4 = i;
+                delay_ms(1000);
+              }
+    }
+
+  }
+
+  }
+
+}
+
+void third_stage(){
+
+ while(carts > 0x00 ){
+  unsigned int c;
+
+for (c=0; c<200; c++){
+  PORTD = PORTD &0xFE;
+  mydelay();   delay_ms(10);
+  if( c == p1){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x01);
+  }
+
+  else if( c == p2){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x01);
+  }
+
+  else if( c == p3){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x01);
+  }
+
+  else if( c == p4){
+     PORTD = PORTD &0xFE;
+     thraw_carts(0x01);
+  }
+
+  PORTD  = PORTD | 0x01;
+  mydelay();     delay_ms(10);
+
+ }
+}
+ }
+
+void thraw_carts(unsigned int n){
+  unsigned int j = 0x00;
+  carts = carts - n;
+ for( j=0; j<n; j++){
+   CCPR1L = 0xFF;
+   delay_ms(2000);
+   CCPR1L = 0x00;
+   if(stage == 0x02){
+    delay_ms(2000);
+   }
+   else {
+       delay_ms(1000);
+   }
+ }
+}
+void mydelay(){
+char a;
+for (a =0; a<200;a++);
+}
+
+// Initialize PWM
+void PWM_Init() {
+    CCPR1L = 0x00; // Stop servo motor
+    CCP1CON = 0x0C;  // Configure CCP1 for PWM
+    T2CON = 0x07; // Configure Timer2 for 50Hz PWM frequency with prescaler = 16
+}
